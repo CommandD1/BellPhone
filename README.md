@@ -1,3 +1,20 @@
+# Klingelspiel 🔔
+
+Android-App, die als laute Türklingel funktioniert: Sobald im WLAN das UDP-Paket `ESP32_ALERT` an Port `4444` ankommt (z. B. vom ESP32-Klingelknopf), klingelt das Handy – auch im Standby, bei gesperrtem Bildschirm und im Lautlos-Modus.
+
+## So funktioniert es
+
+- Der native Vordergrunddienst (`modules/doorbell`) lauscht auf UDP-Port 4444, unabhängig von der JS-Laufzeit. Er hält Wake-, WLAN- und Multicast-Lock, damit Broadcast-Pakete auch bei ausgeschaltetem Bildschirm ankommen, und startet nach einem Neustart automatisch wieder.
+- Beim Klingeln wird der **Wecker-Audiokanal** auf maximale Lautstärke gestellt (danach wiederhergestellt), ein Ding-Dong in Schleife abgespielt und vibriert. Ein Vollbild „Es klingelt!“ erscheint über dem Sperrbildschirm.
+- Ein Klingeln dauert maximal 30 s oder bis „Stopp“ gedrückt wird. Danach werden Signale 10 s lang ignoriert.
+- In der App: Klingel einschalten und alle Punkte der Checkliste erlauben (Benachrichtigungen, Akku-Optimierung aus, Vollbild-Benachrichtigungen).
+
+Nur Android – iOS erlaubt keinen dauerhaften UDP-Empfang im Hintergrund. Der Code nutzt ein eigenes natives Modul, darum geht Expo Go nicht; nötig ist ein Development-Build (`npx expo run:android` oder `eas build --profile development`).
+
+Test im selben WLAN: `python3 test/esp32_simulator.py`
+
+---
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
