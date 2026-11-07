@@ -19,7 +19,7 @@ class DoorbellModule : Module() {
   override fun definition() = ModuleDefinition {
     Name("Doorbell")
 
-    Events("onRing", "onRingStop")
+    Events("onRing", "onRingStop", "onPreviewEnd")
 
     OnCreate {
       Ringer.listener = { name, body -> sendEvent(name, body) }
@@ -55,6 +55,34 @@ class DoorbellModule : Module() {
 
     AsyncFunction("stopRinging") {
       Ringer.stop(context)
+    }
+
+    Function("getRingtones") {
+      Ringtones.all().map { it.first }
+    }
+
+    Function("getSelectedRingtone") {
+      Ringtones.selected(context)
+    }
+
+    Function("setSelectedRingtone") { id: String ->
+      Ringtones.select(context, id)
+    }
+
+    AsyncFunction("previewRingtone") { id: String ->
+      Ringer.preview(context, id)
+    }
+
+    AsyncFunction("stopPreview") {
+      Ringer.stopPreview(context)
+    }
+
+    Function("isOnboarded") {
+      DoorbellService.prefs(context).getBoolean("onboarded", false)
+    }
+
+    Function("setOnboarded") { done: Boolean ->
+      DoorbellService.prefs(context).edit().putBoolean("onboarded", done).apply()
     }
 
     Function("isIgnoringBatteryOptimizations") {

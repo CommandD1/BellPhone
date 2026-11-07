@@ -6,4 +6,5 @@ export type RingEventPayload = {
 export type DoorbellModuleEvents = {
   onRing: (params: RingEventPayload) => void;
   onRingStop: () => void;
+  onPreviewEnd: () => void;
 };

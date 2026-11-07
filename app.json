@@ -1,12 +1,12 @@
 {
   "expo": {
-    "name": "Klingelspiel",
+    "name": "BellPhone",
     "slug": "Klingelspiel",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "klingelspiel",
-    "userInterfaceStyle": "automatic",
+    "scheme": "bellphone",
+    "userInterfaceStyle": "light",
     "ios": {
       "icon": "./assets/expo.icon"
     },

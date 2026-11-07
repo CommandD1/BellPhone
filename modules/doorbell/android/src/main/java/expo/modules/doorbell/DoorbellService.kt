@@ -106,16 +106,16 @@ class DoorbellService : Service() {
   private fun acquireLocks() {
     if (wakeLock == null) {
       wakeLock = getSystemService(PowerManager::class.java)
-        ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Klingelspiel:listener")
+        ?.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BellPhone:listener")
         ?.apply { setReferenceCounted(false); acquire() }
     }
     val wifi = applicationContext.getSystemService(Context.WIFI_SERVICE) as? WifiManager ?: return
     if (wifiLock == null) {
-      wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "Klingelspiel:wifi")
+      wifiLock = wifi.createWifiLock(WifiManager.WIFI_MODE_FULL_HIGH_PERF, "BellPhone:wifi")
         .apply { setReferenceCounted(false); acquire() }
     }
     if (multicastLock == null) {
-      multicastLock = wifi.createMulticastLock("Klingelspiel:multicast")
+      multicastLock = wifi.createMulticastLock("BellPhone:multicast")
         .apply { setReferenceCounted(false); acquire() }
     }
   }

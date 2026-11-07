@@ -1,4 +1,4 @@
-# Klingelspiel 🔔
+# BellPhone 🔔
 
 Android-App, die als laute Türklingel funktioniert: Sobald im WLAN das UDP-Paket `ESP32_ALERT` an Port `4444` ankommt (z. B. vom ESP32-Klingelknopf), klingelt das Handy – auch im Standby, bei gesperrtem Bildschirm und im Lautlos-Modus.
 
@@ -7,7 +7,13 @@ Android-App, die als laute Türklingel funktioniert: Sobald im WLAN das UDP-Pake
 - Der native Vordergrunddienst (`modules/doorbell`) lauscht auf UDP-Port 4444, unabhängig von der JS-Laufzeit. Er hält Wake-, WLAN- und Multicast-Lock, damit Broadcast-Pakete auch bei ausgeschaltetem Bildschirm ankommen, und startet nach einem Neustart automatisch wieder.
 - Beim Klingeln wird der **Wecker-Audiokanal** auf maximale Lautstärke gestellt (danach wiederhergestellt), ein Ding-Dong in Schleife abgespielt und vibriert. Ein Vollbild „Es klingelt!“ erscheint über dem Sperrbildschirm.
 - Ein Klingeln dauert maximal 30 s oder bis „Stopp“ gedrückt wird. Danach werden Signale 10 s lang ignoriert.
-- In der App: Klingel einschalten und alle Punkte der Checkliste erlauben (Benachrichtigungen, Akku-Optimierung aus, Vollbild-Benachrichtigungen).
+- Beim ersten Start führt die App Schritt für Schritt durch alle Erlaubnisse (Benachrichtigungen, Akku-Optimierung, Vollbild über dem Sperrbildschirm) und schaltet die Klingel danach ein. In den Einstellungen lassen sich Klingelton und An/Aus ändern.
+
+## Neuen Klingelton hinzufügen
+
+1. Datei (`.mp3`, `.ogg` oder `.wav`) nach `modules/doorbell/android/src/main/res/raw/` kopieren. Dateiname nur `a-z`, `0-9` und `_`, z. B. `westminster_gong.mp3`. In diesen Ordner gehören nur Klingeltöne.
+2. Optional in `src/ringtones.ts` einen Anzeigenamen eintragen (sonst wird `westminster_gong` zu „Westminster Gong“).
+3. Neu bauen – der Ton erscheint automatisch in den Einstellungen. Der alphabetisch erste ist der Standard.
 
 Nur Android – iOS erlaubt keinen dauerhaften UDP-Empfang im Hintergrund. Der Code nutzt ein eigenes natives Modul, darum geht Expo Go nicht; nötig ist ein Development-Build (`npx expo run:android` oder `eas build --profile development`).
 

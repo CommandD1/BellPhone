@@ -9,7 +9,6 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.RingtoneManager
-import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.Looper
@@ -43,13 +42,15 @@ object Ringer {
   private var vibrator: Vibrator? = null
   private var wakeLock: PowerManager.WakeLock? = null
   private var previousAlarmVolume: Int? = null
+  private var previewPlayer: MediaPlayer? = null
+  private var previewPreviousVolume: Int? = null
   private var lastStopAt = 0L
 
   @Volatile
   var isRinging = false
     private set
 
-  /** Set by the JS module to forward events ("onRing", "onRingStop"). */
+  /** Set by the JS module to forward events ("onRing", "onRingStop", "onPreviewEnd"). */
   @Volatile
   var listener: ((String, Map<String, Any?>) -> Unit)? = null
 
@@ -65,16 +66,60 @@ object Ringer {
     handler.post { stopInternal(app) }
   }
 
+  /** Plays a ringtone once, exactly as loud as a real ring, so it can be tried out. */
+  fun preview(context: Context, id: String) {
+    val app = context.applicationContext
+    handler.post { previewInternal(app, id) }
+  }
+
+  fun stopPreview(context: Context) {
+    val app = context.applicationContext
+    handler.post { stopPreviewInternal(app) }
+  }
+
+  private fun previewInternal(app: Context, id: String) {
+    if (isRinging) return
+    stopPreviewInternal(app, notify = false)
+    val uri = Ringtones.uri(app, id) ?: return
+    previewPreviousVolume = maximizeAlarmVolume(app)
+    val mp = MediaPlayer()
+    try {
+      mp.setAudioAttributes(alarmAttributes())
+      mp.setDataSource(app, uri)
+      mp.setOnCompletionListener { handler.post { stopPreviewInternal(app) } }
+      mp.prepare()
+      mp.start()
+      previewPlayer = mp
+    } catch (e: Exception) {
+      Log.w(TAG, "Could not preview $id", e)
+      mp.release()
+      stopPreviewInternal(app)
+    }
+  }
+
+  private fun stopPreviewInternal(app: Context, notify: Boolean = true) {
+    val wasPlaying = previewPlayer != null || previewPreviousVolume != null
+    previewPlayer?.let {
+      try { it.stop() } catch (_: Exception) {}
+      it.release()
+    }
+    previewPlayer = null
+    restoreAlarmVolume(app, previewPreviousVolume)
+    previewPreviousVolume = null
+    if (wasPlaying && notify) listener?.invoke("onPreviewEnd", emptyMap())
+  }
+
   private fun startInternal(app: Context, source: String, force: Boolean) {
     if (isRinging) return
     if (!force && lastStopAt != 0L && SystemClock.elapsedRealtime() - lastStopAt < COOLDOWN_MS) return
 
     Log.i(TAG, "Ringing (source=$source)")
     appContext = app
+    stopPreviewInternal(app)
     isRinging = true
 
     acquireWakeLock(app)
-    maximizeAlarmVolume(app)
+    previousAlarmVolume = maximizeAlarmVolume(app)
     startSound(app)
     startVibration(app)
     showRingNotification(app)
@@ -99,7 +144,8 @@ object Ringer {
     vibrator?.cancel()
     vibrator = null
 
-    restoreAlarmVolume(app)
+    restoreAlarmVolume(app, previousAlarmVolume)
+    previousAlarmVolume = null
     app.getSystemService(NotificationManager::class.java)?.cancel(RING_NOTIFICATION_ID)
     RingActivity.finishIfShowing()
 
@@ -111,25 +157,27 @@ object Ringer {
 
   private fun acquireWakeLock(app: Context) {
     val pm = app.getSystemService(PowerManager::class.java) ?: return
-    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "Klingelspiel:ring").apply {
+    wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "BellPhone:ring").apply {
       setReferenceCounted(false)
       acquire(RING_DURATION_MS + 5_000L)
     }
   }
 
-  private fun maximizeAlarmVolume(app: Context) {
-    val am = app.getSystemService(AudioManager::class.java) ?: return
-    try {
-      previousAlarmVolume = am.getStreamVolume(AudioManager.STREAM_ALARM)
+  /** Returns the previous alarm volume, or null if it could not be changed. */
+  private fun maximizeAlarmVolume(app: Context): Int? {
+    val am = app.getSystemService(AudioManager::class.java) ?: return null
+    return try {
+      val previous = am.getStreamVolume(AudioManager.STREAM_ALARM)
       am.setStreamVolume(AudioManager.STREAM_ALARM, am.getStreamMaxVolume(AudioManager.STREAM_ALARM), 0)
+      previous
     } catch (e: Exception) {
       Log.w(TAG, "Could not raise alarm volume", e)
+      null
     }
   }
 
-  private fun restoreAlarmVolume(app: Context) {
-    val volume = previousAlarmVolume ?: return
-    previousAlarmVolume = null
+  private fun restoreAlarmVolume(app: Context, volume: Int?) {
+    if (volume == null) return
     try {
       app.getSystemService(AudioManager::class.java)?.setStreamVolume(AudioManager.STREAM_ALARM, volume, 0)
     } catch (e: Exception) {
@@ -138,15 +186,14 @@ object Ringer {
   }
 
   private fun startSound(app: Context) {
+    // Selected ringtone, then the first bundled one, then the system alarm/ringtone.
     val candidates = listOfNotNull(
-      Uri.parse("android.resource://${app.packageName}/${R.raw.doorbell}"),
+      Ringtones.uri(app, Ringtones.selected(app)),
+      Ringtones.uri(app, Ringtones.all().firstOrNull()?.first),
       RingtoneManager.getDefaultUri(RingtoneManager.TYPE_ALARM),
       RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE),
-    )
-    val attributes = AudioAttributes.Builder()
-      .setUsage(AudioAttributes.USAGE_ALARM)
-      .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-      .build()
+    ).distinct()
+    val attributes = alarmAttributes()
 
     for (uri in candidates) {
       val mp = MediaPlayer()
@@ -164,6 +211,11 @@ object Ringer {
       }
     }
   }
+
+  private fun alarmAttributes(): AudioAttributes = AudioAttributes.Builder()
+    .setUsage(AudioAttributes.USAGE_ALARM)
+    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+    .build()
 
   @Suppress("DEPRECATION")
   private fun startVibration(app: Context) {
