@@ -11,6 +11,11 @@
  */
 const NAMES: Record<string, string> = {
   ding_dong: "Ding-Dong",
+  brass: "Bronze",
+  drei_klang: "Drei Klang",
+  big_ben: "Big Ben",
+  kuckuck: "Kuckuck",
+  fahrrad: "Fahrrad",
 };
 
 export function ringtoneName(id: string): string {
